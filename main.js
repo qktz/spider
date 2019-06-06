@@ -8,6 +8,18 @@ const request = require('request')
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
 let mainWindow
+const LISTEN_LIST = [
+  'did-finish-load',
+  'did-navigate',
+  'did-navigate-in-page',
+  'dom-ready',
+  'did-frame-finish-load',
+  'did-start-loading',
+  'did-get-redirect-request',
+  'did-get-response-details',
+  'new-window',
+  'found-in-page',
+];
 let jpgCache = {};
 function createWindow () {
   // Create the browser window.
@@ -37,54 +49,18 @@ function createWindow () {
     console.log('closed')
     mainWindow = null
   })
-
-  mainWindow.webContents.on('did-finish-load', ()=>{
-    console.log('did-finish-load');
-    debug('im finished')
-  })
-
-  mainWindow.webContents.on('did-navigate', ()=>{
-    console.log('did-navigate');
-  })
-
-  mainWindow.webContents.on('did-navigate-in-page', ()=>{
-    console.log('did-navigate-in-page');
-  })
-
-  mainWindow.webContents.on('dom-ready', ()=>{
-    console.log('dom-ready');
-  })
-
-  mainWindow.webContents.on('did-frame-finish-load', ()=>{
-    console.log('did-frame-finish-load');
-  })
-
-  mainWindow.webContents.on('did-start-loading', ()=>{
-    console.log('did-start-loading');
-  })
-
+  for (let index in LISTEN_LIST) {
+    let eventStr = LISTEN_LIST[index]
+    mainWindow.webContents.on(eventStr, ()=>{
+      console.log(eventStr);
+    })
+  }
   mainWindow.webContents.on('did-stop-loading', ()=>{
     console.log('did-stop-loading');
     fs.readFile('reader.js', 'utf8', (err, data)=>{
       mainWindow.webContents.executeJavaScript(data);
     })
   })
-
-  mainWindow.webContents.on('did-get-redirect-request', ()=>{
-    console.log('did-get-redirect-request');
-  })
-
-  mainWindow.webContents.on('did-get-response-details', ()=>{
-    console.log('did-get-response-details');
-  })
-
-  mainWindow.webContents.on('new-window', ()=>{
-    console.log('new-window');
-  })
-
-  mainWindow.webContents.on('found-in-page', function(event, result) {
-    //console.log('find result', result);
-  });  
   
   //mainWindow.webContents.downloadURL('http://main.imgclick.net/i/01160/soukpsutgcc4_t.jpg');
   mainWindow.webContents.session.on('will-download', (event, item, webContents) => {
