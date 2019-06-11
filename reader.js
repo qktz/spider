@@ -1,18 +1,20 @@
 const {ipcRenderer} = require('electron');
 
-var wait = ()=> {
-    let ret = document.querySelector('article');
+
+var wait = (arg)=> {
+    let ret = document.querySelector(arg);
     console.log('ret:', ret, this.name);
     if (ret)
-        return 'exec';
+        return true;
 
-    return 'wait';
+    return false;
 }
 
 var exec = ()=>{
     let a = document.querySelector('article');
     let titleList = new Array();
     let imgs = new Array();
+    let urls = [];
     let times = new Array();
     console.log("im in eva:", a);
     while(a != null) {
@@ -21,9 +23,17 @@ var exec = ()=>{
         console.log(title);
         titleList.push(title);
         
-        let img = a.querySelector("img").getAttributeNode("src").value;
-        console.log(img);
-        imgs.push(img);
+        let p = a.querySelector("p");
+        let mainImg = p.querySelector("img").getAttributeNode("src").value;
+        imgs.push(mainImg);
+
+        let as = p.querySelectorAll("a");
+        let imgList = [];
+        for (let cur of as) {
+            imgList.push(cur.getAttributeNode("href").value);
+        }
+        console.log(imgList);
+        urls.push(imgList);
 
         let time = a.querySelector("time").getAttributeNode("datetime").value;
         console.log(time);
@@ -34,10 +44,10 @@ var exec = ()=>{
     let retObj = {
         titles: titleList,
         imgs: imgs,
+        urls: urls,
         times: times
     }
-    ipcRenderer.send('ren2main', retObj)
-    return 'end';
+    return retObj;
 }
 
 function getElementByAttr(tag, attr, value){
@@ -66,40 +76,48 @@ function end(){
     console.log('end')
     return 'end';
 }
-var stateMach = function (){};
-stateMach.prototype.curState = null;
-stateMach.prototype.states = {};
-stateMach.prototype.init = ()=>{
-    this.curState = 'wait';
-    this.states = {};
-}
-stateMach.prototype.add = (state, func)=>{
-    //this.states[state] = func;
-    this.states[state] = func;
-}
-stateMach.prototype.do = ()=>{
-    if (!this.curState){
-        return;
+
+function subPic() {
+    let pic = document.querySelector('img.pic');
+    let imgUrl = pic.getAttributeNode('src').value;
+    console.log(pic, imgUrl);
+    if (imgUrl) {
+        return imgUrl;
     }
-
-    this.curState = this.states[this.curState]();
-}
-stateMach.prototype.setState = (state)=>{
-    console.log('set state:', state);
-    this.curState = state;
+    return null;
 }
 
-let sm = new stateMach;
-sm.init();
+function idle() {
+    console.log('idle');
+    ipcRenderer.send('ren2main', {
+        func: 'do',
+        args: null
+    });
+    return 'idle';
+}
+
+let sm = new StateMach();
+sm.setState('idle');
 sm.add('wait', wait);
 sm.add('exec', exec);
 sm.add('end', end);
 sm.add('next', next);
+sm.add('idle', idle);
+sm.add('subPic', subPic);
 
 ipcRenderer.on('main2ren', (event, arg)=>{
     console.log('msg:', event, arg);
-    if (arg == 'next') {
-        sm.setState('next');
+    if (arg.func == 'rpc') {
+        console.log(arg);
+        let func = arg.rpc.func;
+        let args = arg.rpc.args;
+        ret = sm.callFunc(func, args);
+
+        ipcRenderer.send('ren2main', {
+            func: 'rpcret',
+            args: ret,
+            rpcid: arg.rpcid
+        });
     }
 })
 

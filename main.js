@@ -4,6 +4,7 @@ const debug = require('debug')('spider')
 const fs = require('fs')
 const path = require('path')
 const request = require('request')
+const StateMach = require('./StateMach');
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -20,7 +21,15 @@ const LISTEN_LIST = [
   'new-window',
   'found-in-page',
 ];
-let jpgCache = {};
+let g_jpgCache = {};
+let g_curObj = null;
+let g_urlDownCount = 0;
+let g_urlMax = 0;
+let g_renderState = 'idle';
+let g_iter = null;
+let g_subObj = null;
+let g_rpc = {};
+let g_rpcids = [];
 function createWindow () {
   // Create the browser window.
   console.log('will create window');
@@ -57,8 +66,14 @@ function createWindow () {
   }
   mainWindow.webContents.on('did-stop-loading', ()=>{
     console.log('did-stop-loading');
-    fs.readFile('reader.js', 'utf8', (err, data)=>{
-      mainWindow.webContents.executeJavaScript(data);
+    let wholeData = "";
+    fs.readFile('StateMach.js', 'utf8', (err, data)=>{
+      //mainWindow.webContents.executeJavaScript(data);
+      wholeData += data;
+      fs.readFile('reader.js', 'utf8', (err, data)=>{
+        wholeData += data;
+        mainWindow.webContents.executeJavaScript(wholeData);
+      })
     })
   })
   
@@ -66,7 +81,9 @@ function createWindow () {
   mainWindow.webContents.session.on('will-download', (event, item, webContents) => {
     //设置文件存放位置
     console.log('will-down')
-    let savePath = path.join(__dirname, 'data', path.basename(item.getURL()));
+    let savePath = g_jpgCache[item.getURL()];
+    let pathName = path.dirname(savePath);
+    mkdir(pathName);
     item.setSavePath(savePath);
     item.on('updated', (event, state) => {
       if (state === 'interrupted') {
@@ -81,19 +98,21 @@ function createWindow () {
     })
     item.once('done', (event, state) => {
       if (state === 'completed') {
-        console.log('Download successfully')
+        console.log('Download successfully', g_urlDownCount, g_urlMax);
+        g_urlDownCount += 1;
+        /*
         let basename = path.basename(savePath);
-        if (!basename in jpgCache) {
+        if (!basename in g_jpgCache) {
           console.log('err', basename);
           return;
         }
-        let dstname = jpgCache[basename];
+        let dstname = g_jpgCache[basename];
         console.log(savePath, dstname);
         fs.rename(savePath, dstname, (err)=>{
           if (err) {
             console.log('rename err:', err);
           }
-        });
+        });*/
       } else {
         console.log(`Download failed: ${state}`)
       }
@@ -123,23 +142,6 @@ app.on('activate', function () {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
-function processResult(retObj) {
-  //console.log(retObj);
-  let len = retObj.imgs.length;
-  let ret = 'next';
-  for (let i = 0; i < len; i++) {
-    let img = retObj.imgs[i];
-    let time = retObj.times[i];
-    let title = retObj.titles[i];
-
-    downloadOne(img, time, title);
-    let dateVal = getDayVal(getDay(time));
-    if (dateVal < 20190509) {
-      ret = 'pong'
-    }
-  }
-  return ret;
-}
 
 function getDay(data) {
   let ret = /\d+-\d+-\d+/.exec(data);
@@ -164,39 +166,164 @@ function mkdir(pathname) {
   fs.mkdirSync(pathname);
 }
 
-function downloadOne(img, time, title) {
-  let date = getDay(time);
-  let pathname = path.join(__dirname, 'data', date);
-  //console.log(title);
-  title = title.replace(/[^\w-]+/g, '');
-  let filename = title + '.jpg';
-  let fullname = path.join(pathname, filename);
-  if (fs.existsSync(fullname)) {
+function downloadOne(url, saveName) {
+  if (fs.existsSync(saveName)) {
     return;
   }
 
-  mkdir(pathname);
-  let basename = path.basename(img);
-  jpgCache[basename] = fullname;
-  console.log('add:', basename, fullname);
-  mainWindow.webContents.downloadURL(img);
+  g_jpgCache[url] = saveName;
+  console.log('down one:', url);
+  mainWindow.webContents.downloadURL(url);
+}
+
+function getFullname(time, title) {
+  let date = getDay(time);
+  let pathname = path.join(__dirname, 'data', date);
+  title = title.replace(/[^\w-]+/g, '');
+  return path.join(pathname, title);
+}
+
+function downloadImg(img, time, title) {
+  let finalName = getFullname(time, title) + '.jpg';
+  console.log('final:', img, finalName);
+  downloadOne(img, finalName);
   return;
-  request.head(img, function(err, res, body){
-    if (err) {
-        console.log('err: '+ err);
-    }
-    request(img)
-        .pipe(fs.createWriteStream(fullname))
-        .on('close', function(){
-            console.log('Done : ', img);
-        });
-  });
 }
 ///will delete---------------------start------------------------------
 //will delete -----------------------end -----------------------------
+
+
+function processResult(retObj) {
+  //console.log(retObj);
+  g_curObj = retObj;
+  let len = retObj.imgs.length;
+  g_urlMax += len;
+  for (let i = 0; i < len; i++) {
+    let img = retObj.imgs[i];
+    let time = retObj.times[i];
+    let title = retObj.titles[i];
+
+    downloadImg(img, time, title);
+    let dateVal = getDayVal(getDay(time));
+    if (dateVal < 20190606) {
+    }
+  }
+  return 'idle';
+}
+
+function doRpc(func, args, retFunc) {
+  for (let i = 1; i < 65535; i++) {
+    if (!(i in g_rpc)) {
+      g_rpc[i] = {
+        func: func,
+        args: args,
+        retFunc: retFunc
+      }
+      g_rpcids.push(i);
+      break;
+    }
+  }
+}
+
+function main() {
+  console.log('main')
+  doRpc('wait', 'article', (isFind)=>{
+    sm.setState('getMainobj');
+  })
+  return 'main';
+}
+
+function getMainobj() {
+  doRpc('exec', null, (retObj)=>{
+    console.log('exec ret:', retObj);
+    processResult(retObj);
+    sm.setState('waitMainImgDown');
+  })
+  return 'getMainobj'
+}
+
+function waitMainImgDown() {
+  if (g_urlDownCount == g_urlMax) {
+    function* getIter(){
+      for (let i in g_curObj.urls) {
+        let fullname = getFullname(g_curObj.times[i], g_curObj.titles[i]);
+        urlList = g_curObj.urls[i];
+        for (let j in urlList) {
+          yield {
+            url: urlList[j],
+            name: fullname + '_' + j + '.jpg',
+            isok: false,
+            trueUrl: null
+          };
+        }
+      }
+    }
+    g_iter = getIter();
+    return 'subPage';
+  }
+  return 'waitMainImgDown';
+}
+
+function idle() {
+  return 'idle';
+}
+
+function subPage() {
+  let cur = g_iter.next();
+  if (!cur.done) {
+    g_subObj = cur.value;
+    mainWindow.loadURL(g_subObj.url);
+    return 'downSub';
+  }
+  console.log(g_iter.next());
+  return 'subPage';
+}
+
+function downSub() {
+  doRpc('subPic', null, (retUrl)=>{
+    if (retUrl) {
+      downloadOne(retUrl, g_subObj.name);
+    }
+    sm.setState('subPage');
+  })
+  return 'downSub';
+}
+
+function downSubPic(retUrl) {
+  return 'idle';
+}
+
+var sm = new StateMach();
+sm.setState('main');
+sm.add('processResult', processResult);
+sm.add('main', main);
+sm.add('idle', idle);
+sm.add('subPage', subPage);
+sm.add('downSub', downSub);
+sm.add('downSubPic', downSubPic);
+sm.add('getMainobj', getMainobj);
+sm.add('waitMainImgDown', waitMainImgDown);
+
 ipcMain.on('ren2main', (event, arg)=>{
-  let ret = processResult(arg);
-  event.sender.send('main2ren', ret)
+  let func = arg.func;
+  let args = arg.args;
+  if (func == 'do') {
+    sm.do();
+    let rpcid = g_rpcids.pop();
+    if (rpcid) {
+      event.sender.send('main2ren', {
+        func: 'rpc',
+        rpc: g_rpc[rpcid],
+        rpcid: rpcid
+      });
+    }
+  }
+  else if (func == 'rpcret'){
+    let obj = g_rpc[arg.rpcid];
+    //console.log(g_rpc, arg, arg.rpcid, obj);
+    obj.retFunc(args);
+    delete g_rpc[arg.rpcid];
+  }
 })
 /*
 setInterval(()=>{
