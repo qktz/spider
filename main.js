@@ -81,10 +81,10 @@ function createWindow () {
   mainWindow.webContents.session.on('will-download', (event, item, webContents) => {
     //设置文件存放位置
     console.log('will-down')
-    let savePath = g_jpgCache[item.getURL()];
-    let pathName = path.dirname(savePath);
+    let saveInfo = g_jpgCache[item.getURL()];
+    let pathName = path.dirname(saveInfo.saveName);
     mkdir(pathName);
-    item.setSavePath(savePath);
+    item.setSavePath(saveInfo.saveName);
     item.on('updated', (event, state) => {
       if (state === 'interrupted') {
         console.log('Download is interrupted but can be resumed')
@@ -99,20 +99,9 @@ function createWindow () {
     item.once('done', (event, state) => {
       if (state === 'completed') {
         console.log('Download successfully', g_urlDownCount, g_urlMax);
-        g_urlDownCount += 1;
-        /*
-        let basename = path.basename(savePath);
-        if (!basename in g_jpgCache) {
-          console.log('err', basename);
-          return;
+        if (saveInfo.func) {
+          saveInfo.func();
         }
-        let dstname = g_jpgCache[basename];
-        console.log(savePath, dstname);
-        fs.rename(savePath, dstname, (err)=>{
-          if (err) {
-            console.log('rename err:', err);
-          }
-        });*/
       } else {
         console.log(`Download failed: ${state}`)
       }
@@ -166,12 +155,15 @@ function mkdir(pathname) {
   fs.mkdirSync(pathname);
 }
 
-function downloadOne(url, saveName) {
+function downloadOne(url, saveName, func) {
   if (fs.existsSync(saveName)) {
     return;
   }
 
-  g_jpgCache[url] = saveName;
+  g_jpgCache[url] = {
+    saveName: saveName,
+    func: func
+  };
   console.log('down one:', url);
   mainWindow.webContents.downloadURL(url);
 }
@@ -186,7 +178,9 @@ function getFullname(time, title) {
 function downloadImg(img, time, title) {
   let finalName = getFullname(time, title) + '.jpg';
   console.log('final:', img, finalName);
-  downloadOne(img, finalName);
+  downloadOne(img, finalName, ()=>{
+    g_urlDownCount += 1;
+  });
   return;
 }
 ///will delete---------------------start------------------------------
