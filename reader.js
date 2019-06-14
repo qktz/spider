@@ -86,13 +86,20 @@ function subPic() {
     }
     return null;
 }
-
+g_state = 0;
 function idle() {
-    console.log('idle');
     ipcRenderer.send('ren2main', {
         func: 'do',
         args: null
     });
+
+    if (!g_state) {
+        g_state = 1;
+        ipcRenderer.send('ren2main', {
+            func: 'init',
+            args: null
+        });
+    }
     return 'idle';
 }
 

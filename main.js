@@ -157,6 +157,9 @@ function mkdir(pathname) {
 
 function downloadOne(url, saveName, func) {
   if (fs.existsSync(saveName)) {
+    if (func){
+      func();
+    }
     return;
   }
 
@@ -229,7 +232,7 @@ function main() {
 
 function getMainobj() {
   doRpc('exec', null, (retObj)=>{
-    console.log('exec ret:', retObj);
+    //console.log('exec ret:', retObj);
     processResult(retObj);
     sm.setState('waitMainImgDown');
   })
@@ -237,6 +240,7 @@ function getMainobj() {
 }
 
 function waitMainImgDown() {
+  console.log('waitMainImgDown', g_urlDownCount, g_urlMax)
   if (g_urlDownCount == g_urlMax) {
     function* getIter(){
       for (let i in g_curObj.urls) {
@@ -269,7 +273,12 @@ function subPage() {
     mainWindow.loadURL(g_subObj.url);
     return 'downSub';
   }
-  console.log(g_iter.next());
+  else {
+    doRpc('next', null, (retObj)=>{
+
+    })
+    return 'idle';
+  }
   return 'subPage';
 }
 
@@ -283,23 +292,19 @@ function downSub() {
   return 'downSub';
 }
 
-function downSubPic(retUrl) {
-  return 'idle';
-}
-
 var sm = new StateMach();
-sm.setState('main');
+sm.setState('idle');
 sm.add('processResult', processResult);
 sm.add('main', main);
 sm.add('idle', idle);
 sm.add('subPage', subPage);
 sm.add('downSub', downSub);
-sm.add('downSubPic', downSubPic);
 sm.add('getMainobj', getMainobj);
 sm.add('waitMainImgDown', waitMainImgDown);
 
 ipcMain.on('ren2main', (event, arg)=>{
   let func = arg.func;
+  console.log('ipc main:', func, sm.curState);
   let args = arg.args;
   if (func == 'do') {
     sm.do();
@@ -310,6 +315,7 @@ ipcMain.on('ren2main', (event, arg)=>{
         rpc: g_rpc[rpcid],
         rpcid: rpcid
       });
+      return;
     }
   }
   else if (func == 'rpcret'){
@@ -318,6 +324,18 @@ ipcMain.on('ren2main', (event, arg)=>{
     obj.retFunc(args);
     delete g_rpc[arg.rpcid];
   }
+  else if (func == 'init') {
+    console.log('in init', sm.curState);
+    if (sm.curState == 'idle')
+    {
+      sm.setState('main');
+    }
+  }
+  
+  event.sender.send('main2ren', {
+    func: 'null',
+    cur: sm.curState
+  });
 })
 /*
 setInterval(()=>{
