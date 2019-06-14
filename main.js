@@ -274,9 +274,7 @@ function subPage() {
     return 'downSub';
   }
   else {
-    doRpc('next', null, (retObj)=>{
-
-    })
+    mainWindow.loadURL(g_curObj.nextUrl);
     return 'idle';
   }
   return 'subPage';

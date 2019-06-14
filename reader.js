@@ -41,11 +41,15 @@ var exec = ()=>{
         //end
         a = a.querySelector("article");
     }
+    
+    let nextA = getElementByAttr('a', 'class', 'next page-numbers');
+    let nextUrl = nextA.getAttributeNode('href').value;
     let retObj = {
         titles: titleList,
         imgs: imgs,
         urls: urls,
-        times: times
+        times: times,
+        nextUrl: nextUrl,
     }
     return retObj;
 }
@@ -79,10 +83,12 @@ function end(){
 
 function subPic() {
     let pic = document.querySelector('img.pic');
-    let imgUrl = pic.getAttributeNode('src').value;
-    console.log(pic, imgUrl);
-    if (imgUrl) {
-        return imgUrl;
+    if (pic) {
+        let imgUrl = pic.getAttributeNode('src').value;
+        console.log(pic, imgUrl);
+        if (imgUrl) {
+            return imgUrl;
+        }
     }
     return null;
 }
