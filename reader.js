@@ -118,22 +118,5 @@ sm.add('next', next);
 sm.add('idle', idle);
 sm.add('subPic', subPic);
 
-ipcRenderer.on('main2ren', (event, arg)=>{
-    console.log('msg:', event, arg);
-    if (arg.func == 'rpc') {
-        console.log(arg);
-        let func = arg.rpc.func;
-        let args = arg.rpc.args;
-        ret = sm.callFunc(func, args);
 
-        ipcRenderer.send('ren2main', {
-            func: 'rpcret',
-            args: ret,
-            rpcid: arg.rpcid
-        });
-    }
-})
 
-setInterval(()=>{
-    sm.do();
-}, 1000)
