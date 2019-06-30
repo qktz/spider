@@ -53,18 +53,6 @@ var exec = ()=>{
     }
     return retObj;
 }
-
-function getElementByAttr(tag, attr, value){
-    var elements = document.getElementsByTagName(tag);
-    for (var i = 0; i < elements.length; i++){
-        if (elements[i].getAttribute(attr) == value)
-        {
-            return elements[i];
-        }
-    }
-    return null;
-}
-
 function next() {
     let a = getElementByAttr('a', 'class', 'next page-numbers');
     console.log('on next:', a);
@@ -79,18 +67,6 @@ function next() {
 function end(){
     console.log('end')
     return 'end';
-}
-
-function subPic() {
-    let pic = document.querySelector('img.pic');
-    if (pic) {
-        let imgUrl = pic.getAttributeNode('src').value;
-        console.log(pic, imgUrl);
-        if (imgUrl) {
-            return imgUrl;
-        }
-    }
-    return null;
 }
 g_state = 0;
 function idle() {

@@ -5,7 +5,9 @@ const fs = require('fs')
 const path = require('path')
 const request = require('request')
 const StateMach = require('./StateMach');
-const config = require('./apple/config');
+let g_dirBase = 'Classification';
+
+const config = require('./' + g_dirBase + '/config');
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -22,8 +24,9 @@ const LISTEN_LIST = [
   'new-window',
   'found-in-page',
 ];
-let g_dirBase = 'apple';
 let g_idIndex = 1;
+let g_timerId = 0;
+let g_timeout = 30;
 let g_curUrl = '';
 let g_jpgCache = {};
 let g_rpcRetList = [];
@@ -63,11 +66,28 @@ function createWindow () {
       console.log(eventStr);
     })
   }
+
+  mainWindow.webContents.on('did-start-loading', ()=>{
+    let timeCount = 0;
+    g_timerId = setInterval(() => {
+      timeCount ++;
+      console.log('timer:', timeCount, g_timeout);
+      if (timeCount > g_timeout) {
+        _loadFromCache();
+      }
+    }, 1000);
+    //console.log('set timer:', g_timerId)
+  })
+
   mainWindow.webContents.on('did-stop-loading', ()=>{
-    console.log('did-stop-loading');
+    console.log('did-stop-loading', mainWindow.webContents.getURL());
+    if (g_timerId) {
+      clearInterval(g_timerId);
+      g_timerId = 0;
+    }
     let wholeData = "g_idIndex = " + g_idIndex + ";";
     g_idIndex = (g_idIndex + 1) % 100;
-    let urlList = _getJsList(g_curUrl);
+    let urlList = _getJsList(mainWindow.webContents.getURL());
     function* _makeUrlIter() {
       yield '_innerUtils.js';
       for (url of urlList) {
@@ -163,21 +183,46 @@ function _getJsList(url) {
 }
 
 function _loadUrl(url) {
-  mainWindow.loadURL(url);
+  if (url == "index.html") {
+    mainWindow.loadFile(url);
+  }
+  else {
+    mainWindow.loadURL(url);
+  }
   g_curUrl = url;
 }
 
+function _loadFromCache() {
+  let pageCache = g_pageCacheList.shift();
+  //console.log('pageCache:', pageCache);
+  if (!pageCache) {
+    return;
+  }
+
+  g_curPageCache = pageCache.cache;
+  if (pageCache.url) {
+    _loadUrl(pageCache.url);
+  }
+}
+
 function mkdir(pathname) {
-  console.log(pathname);
+  //console.log(pathname);
   if (fs.existsSync(pathname)) {
     return;
   }
 
   let parent = path.dirname(pathname);
   if (!fs.existsSync(parent)) {
+    console.log('mkdir parent', parent);
     mkdir(parent);
   }
   fs.mkdirSync(pathname);
+}
+
+function rpc_rename(rpcId, srcPath, dstPath) {
+  mkdir(path.dirname(dstPath));
+  fs.renameSync(srcPath, dstPath);
+  onRpcRet(rpcId, []);
 }
 
 function rpc_downloadOne(rpcId, url, saveName) {
@@ -185,7 +230,7 @@ function rpc_downloadOne(rpcId, url, saveName) {
     onRpcRet(rpcId, [true]);
   }
   console.log('down one:', url, saveName);
-  saveName = path.join(__dirname, saveName);
+  //saveName = path.join(__dirname, saveName);
   if (fs.existsSync(saveName)) {
     if (func){
       func();
@@ -218,17 +263,23 @@ function rpc_addPage(rpcId, pageUrl, pageCache) {
 }
 
 function rpc_loadPage(rpcId) {
-  let pageCache = g_pageCacheList.shift();
-  console.log('pageCache:', pageCache);
-  g_curPageCache = pageCache.cache;
-  if (pageCache.url) {
-    _loadUrl(pageCache.url);
-    onRpcRet(rpcId, []);
-  }
+  onRpcRet(rpcId, []);
+  _loadFromCache();
+}
+
+function rpc_loadWithUrl(rpcId, url, obj) {
+  onRpcRet(rpcId, []);
+  g_curPageCache = obj;
+  _loadUrl(url);
 }
 
 function rpc_getCurCache(rpcId) {
   onRpcRet(rpcId, [g_curPageCache]);
+}
+
+function rpc_getFileList(rpcId, dirPath) {
+  let ret = fs.readdirSync(dirPath);
+  onRpcRet(rpcId, [ret]);
 }
 
 function onRpcRet(rpcId, args) {
