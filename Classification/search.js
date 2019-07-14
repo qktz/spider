@@ -5,5 +5,7 @@ if (result) {
     result.click();
 }
 else {
-    loadPage();
+    ignore(() => {
+        loadPage();
+    });
 }

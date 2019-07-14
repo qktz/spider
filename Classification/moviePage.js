@@ -1,15 +1,15 @@
 console.log('movie test');
 function moveFile(actor) {
     getCurCache((cache) => {
-        let srcPath = 'J:\\889914\\video\\' + cache.filename;
-        let dstDir = 'J:\\889914\\sort\\' + actor
+        let prefix = cache.uncensored ? 'w_' : 'a_';
+        let srcPath = videoDir + cache.filename;
+        let dstDir = sortDir + prefix + actor;
         let dstPath = dstDir + '\\' + cache.filename;
         console.log(srcPath, dstPath);
         rpcCall('rename', [srcPath, dstPath], () => {
             let bigJpgA = document.querySelector('a.bigImage');
             let bigJpgUrl = bigJpgA.querySelector('img').getAttributeNode('src').value;
-            let prefix = cache.uncensored ? 'w_' : 'a_';
-            rpcCall('downloadOne', [bigJpgUrl, dstDir + '\\' + prefix + cache.code + '.jpg'], (ret)=>{
+            rpcCall('downloadOne', [bigJpgUrl, dstDir + '\\' + cache.code + '.jpg'], (ret)=>{
                 loadPage();
             });
         })
@@ -25,7 +25,10 @@ function main() {
             return;
         }
     };
-    loadPage();
+
+    ignore(() => {
+        loadPage();
+    });
 }
 
 main();

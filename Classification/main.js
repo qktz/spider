@@ -19,7 +19,30 @@ function parseUncensored(oriCode) {
     }
 }
 
-function parseCode(oriCode) {
+function parseWithPat(oriCode) {
+    if (oriCode.search(/(sdde|adn)/i) != -1) {
+        return {
+            code: oriCode.match(/(sdde|adn)[\-\_]?\d+/i)[0],
+            uncensored: false,
+        }
+    }
+    else if (oriCode.search(/(hey)/i) != -1) {
+        return {
+            code: oriCode.match(/(hey)[\-\_]?\d+/i)[0],
+            uncensored: true,
+        }
+    }
+    else {
+        return false;
+    }
+}
+
+function parseCode(oriCode, filename) {
+    let patCode = parseWithPat(filename);
+    if (patCode) {
+        return patCode;
+    }
+
     let newCode = parseUncensored(oriCode);
     if (newCode) {
         return {
@@ -37,16 +60,24 @@ function parseCode(oriCode) {
     };
 }
 
+function isIgnore(oriCode) {
+    return oriCode.indexOf('ignore_') == 0 ? true : false;
+}
+
 rpcCall('getFileList', ['J:\\889914\\video'], (ret)=>{
     let codeList = [];
     for (let filename of ret) {
+        if (isIgnore(filename)) {
+            continue;
+        }
+
         let oriName = filename;
         filename = filename.replace(/[^\w-]+/g, ' ');
         let codes = filename.split(' ').filter((nameStr) => {
             return nameStr.indexOf('-') != -1;
         });
         if (codes.length) {
-            let codeObj = parseCode(codes[0]);
+            let codeObj = parseCode(codes[0], filename);
             codeList.push({
                 code: codeObj.code,
                 filename: oriName,
@@ -60,5 +91,5 @@ rpcCall('getFileList', ['J:\\889914\\video'], (ret)=>{
         let url = getSearchUrl(codeInfo, codeInfo.uncensored);
         addPage(url, codeInfo);
     }
-    loadPage();
+    //loadPage();
 });

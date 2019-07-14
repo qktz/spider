@@ -6,11 +6,11 @@ content_scripts = [
     },
     {
         matches: [/search/],
-        js:["search.js"]
+        js:["utils.js", "search.js"]
     },
     {
         matches: [/https:\/\/www\.buscdn\.life\/[\w-]+$/],
-        js:["moviePage.js"]
+        js:["utils.js", "moviePage.js"]
     }
 ]
 

@@ -81,33 +81,7 @@ function createWindow () {
 
   mainWindow.webContents.on('did-stop-loading', ()=>{
     console.log('did-stop-loading', mainWindow.webContents.getURL());
-    if (g_timerId) {
-      clearInterval(g_timerId);
-      g_timerId = 0;
-    }
-    let wholeData = "g_idIndex = " + g_idIndex + ";";
-    g_idIndex = (g_idIndex + 1) % 100;
-    let urlList = _getJsList(mainWindow.webContents.getURL());
-    function* _makeUrlIter() {
-      yield '_innerUtils.js';
-      for (url of urlList) {
-        yield path.join(g_dirBase, url);
-      }
-    }
-    let urlIter = _makeUrlIter();
-    
-    function _loadAllJs(err, data) {
-      wholeData += data;
-      let _js = urlIter.next();
-      if (!_js.done) {
-        let filename = _js.value;
-        fs.readFile(filename, 'utf8', _loadAllJs);
-      }
-      else {
-        mainWindow.webContents.executeJavaScript(wholeData);
-      }
-    };
-    _loadAllJs(null, '');
+    _addScript();
   })
   
   //mainWindow.webContents.downloadURL('http://main.imgclick.net/i/01160/soukpsutgcc4_t.jpg');
@@ -167,6 +141,36 @@ app.on('activate', function () {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
+
+function _addScript() {
+  if (g_timerId) {
+    clearInterval(g_timerId);
+    g_timerId = 0;
+  }
+  let wholeData = "g_idIndex = " + g_idIndex + ";";
+  g_idIndex = (g_idIndex + 1) % 100;
+  let urlList = _getJsList(mainWindow.webContents.getURL());
+  function* _makeUrlIter() {
+    yield '_innerUtils.js';
+    for (url of urlList) {
+      yield path.join(g_dirBase, url);
+    }
+  }
+  let urlIter = _makeUrlIter();
+  
+  function _loadAllJs(err, data) {
+    wholeData += data;
+    let _js = urlIter.next();
+    if (!_js.done) {
+      let filename = _js.value;
+      fs.readFile(filename, 'utf8', _loadAllJs);
+    }
+    else {
+      mainWindow.webContents.executeJavaScript(wholeData);
+    }
+  };
+  _loadAllJs(null, '');
+}
 
 function _getJsList(url) {
   let retList = [];
